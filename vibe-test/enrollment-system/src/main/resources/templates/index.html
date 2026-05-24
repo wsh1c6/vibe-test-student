@@ -232,16 +232,17 @@
             <h2>选课检索</h2>
             <div class="search-box">
                 <form th:action="@{/search}" method="get" style="display:flex; width:100%; gap:10px;">
+                    <input type="hidden" name="lastCsvData" th:value="${csvData}">
                     <input type="text" name="keyword" th:value="${searchKeyword}" placeholder="支持按学生ID、课程ID、课程名称、课程类型检索">
                     <button type="submit" class="btn btn-primary">搜索</button>
                 </form>
             </div>
             
             <div class="filter-tabs">
-                <a th:href="@{/filter(courseType='all')}" class="btn btn-secondary" th:classappend="${filterType == null or filterType == 'all'} ? 'active' : ''">全部</a>
-                <a th:href="@{/filter(courseType='公共课')}" class="btn btn-secondary" th:classappend="${filterType == '公共课'} ? 'active' : ''">公共课</a>
-                <a th:href="@{/filter(courseType='专业课')}" class="btn btn-secondary" th:classappend="${filterType == '专业课'} ? 'active' : ''">专业课</a>
-                <a th:href="@{/filter(courseType='选修课')}" class="btn btn-secondary" th:classappend="${filterType == '选修课'} ? 'active' : ''">选修课</a>
+                <a th:href="@{/filter(courseType='all',lastCsvData=${csvData})}" class="btn btn-secondary" th:classappend="${filterType == null or filterType == 'all'} ? 'active' : ''">全部</a>
+                <a th:href="@{/filter(courseType='公共课',lastCsvData=${csvData})}" class="btn btn-secondary" th:classappend="${filterType == '公共课'} ? 'active' : ''">公共课</a>
+                <a th:href="@{/filter(courseType='专业课',lastCsvData=${csvData})}" class="btn btn-secondary" th:classappend="${filterType == '专业课'} ? 'active' : ''">专业课</a>
+                <a th:href="@{/filter(courseType='选修课',lastCsvData=${csvData})}" class="btn btn-secondary" th:classappend="${filterType == '选修课'} ? 'active' : ''">选修课</a>
             </div>
         </div>
         

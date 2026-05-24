@@ -6,7 +6,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Controller
 public class EnrollmentController {
@@ -38,9 +41,27 @@ public class EnrollmentController {
     }
 
     @GetMapping("/search")
-    public String search(@RequestParam String keyword, Model model) {
+    public String search(@RequestParam String keyword, 
+                         @RequestParam(required = false) String lastCsvData, 
+                         Model model) {
+        List<EnrollRecord> allRecords = new ArrayList<>();
+        
+        // 如果有导入数据，先处理导入的数据
+        if (lastCsvData != null && !lastCsvData.isEmpty()) {
+            List<EnrollRecord> importedRecords = enrollmentService.parseCsvData(lastCsvData);
+            List<EnrollRecord> processedRecords = enrollmentService.processEnrollments(importedRecords);
+            allRecords.addAll(processedRecords);
+        }
+        
+        // 合并样例数据
         List<EnrollRecord> sampleData = enrollmentService.getSampleData();
-        List<EnrollRecord> searchResults = enrollmentService.searchRecords(sampleData, keyword);
+        allRecords.addAll(sampleData);
+        
+        // 去重合并
+        Set<EnrollRecord> mergedSet = new LinkedHashSet<>(allRecords);
+        List<EnrollRecord> mergedList = new ArrayList<>(mergedSet);
+        
+        List<EnrollRecord> searchResults = enrollmentService.searchRecords(mergedList, keyword);
 
         model.addAttribute("records", searchResults);
         model.addAttribute("searchKeyword", keyword);
@@ -53,14 +74,29 @@ public class EnrollmentController {
     }
 
     @GetMapping("/filter")
-    public String filterByType(@RequestParam String courseType, Model model) {
-        List<EnrollRecord> allRecords = enrollmentService.getSampleData();
+    public String filterByType(@RequestParam String courseType, 
+                               @RequestParam(required = false) String lastCsvData,
+                               Model model) {
+        List<EnrollRecord> allRecords = new ArrayList<>();
+        
+        if (lastCsvData != null && !lastCsvData.isEmpty()) {
+            List<EnrollRecord> importedRecords = enrollmentService.parseCsvData(lastCsvData);
+            List<EnrollRecord> processedRecords = enrollmentService.processEnrollments(importedRecords);
+            allRecords.addAll(processedRecords);
+        }
+        
+        List<EnrollRecord> sampleData = enrollmentService.getSampleData();
+        allRecords.addAll(sampleData);
+        
+        Set<EnrollRecord> mergedSet = new LinkedHashSet<>(allRecords);
+        List<EnrollRecord> mergedList = new ArrayList<>(mergedSet);
+        
         List<EnrollRecord> filteredRecords;
 
         if (courseType == null || courseType.isEmpty() || courseType.equals("all")) {
-            filteredRecords = allRecords;
+            filteredRecords = mergedList;
         } else {
-            filteredRecords = allRecords.stream()
+            filteredRecords = mergedList.stream()
                     .filter(r -> courseType.equals(r.getCourseType()))
                     .collect(java.util.stream.Collectors.toList());
         }
