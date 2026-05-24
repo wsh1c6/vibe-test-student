@@ -157,3 +157,217 @@ GROUP BY c.course_id, c.course_name
 HAVING COUNT(e.student_id) > 50
 ORDER BY enroll_count ASC;
 ```
+
+## 三题实现详解
+
+### 第一题：Java基础处理工具
+
+#### 需求
+接收学生选课信息列表，实现去重、排序、输出三大核心功能。
+
+#### 实现思路
+
+1. **去重逻辑**
+   - 规则：学生ID + 课程ID 完全一致视为重复记录
+   - 实现：重写 `EnrollRecord` 类的 `equals()` 和 `hashCode()` 方法，基于 studentId 和 courseId 计算
+   - 使用 `LinkedHashSet` 保持插入顺序的同时去除重复
+
+2. **排序逻辑**
+   - 规则：先按学生ID升序，学生ID相同时按课程ID升序
+   - 实现：使用 Java 8 Stream API 的 `Comparator`
+   ```java
+   list.sort(Comparator.comparing(EnrollRecord::getStudentId)
+           .thenComparing(EnrollRecord::getCourseId));
+   ```
+
+3. **输出格式**
+   - 格式：`学生ID：XXX，课程ID：XXX，课程名称：XXX`
+   - 实现：重写 `toString()` 方法
+
+#### 核心代码
+
+```java
+// EnrollRecord.java - 去重实现
+@Override
+public boolean equals(Object o) {
+    if (this == o) return true;
+    EnrollRecord that = (EnrollRecord) o;
+    return studentId.equals(that.studentId) && courseId.equals(that.courseId);
+}
+
+@Override
+public int hashCode() {
+    return 31 * studentId.hashCode() + courseId.hashCode();
+}
+
+// EnrollmentService.java - 处理流程
+public List<EnrollRecord> processEnrollments(List<EnrollRecord> records) {
+    // 1. 去重
+    Set<EnrollRecord> deduplicatedSet = new LinkedHashSet<>(records);
+    
+    // 2. 排序
+    List<EnrollRecord> sortedList = new ArrayList<>(deduplicatedSet);
+    sortedList.sort(Comparator.comparing(EnrollRecord::getStudentId)
+            .thenComparing(EnrollRecord::getCourseId));
+    
+    return sortedList;
+}
+```
+
+---
+
+### 第二题：SQL统计查询
+
+#### 题目1：统计每门课程的选课人数（降序）
+
+**需求**：返回课程ID、课程名称、选课人数（enroll_count），按选课人数降序排序
+
+**实现**：
+```sql
+SELECT 
+    c.course_id AS courseId,
+    c.course_name AS courseName,
+    COUNT(e.student_id) AS enroll_count
+FROM courses c
+LEFT JOIN enrollments e ON c.course_id = e.course_id
+GROUP BY c.course_id, c.course_name
+ORDER BY enroll_count DESC;
+```
+
+**关键点**：
+- 使用 `LEFT JOIN` 确保没有选课记录的课程也显示（人数为0）
+- `GROUP BY` 按课程分组统计
+- `COUNT(e.student_id)` 统计选课人数
+- `ORDER BY enroll_count DESC` 按人数降序
+
+---
+
+**题目2：统计选课人数超过50人的专业课（升序）**
+
+**需求**：返回课程ID、课程名称、选课人数，按选课人数升序排序
+
+**实现**：
+```sql
+SELECT 
+    c.course_id AS courseId,
+    c.course_name AS courseName,
+    COUNT(e.student_id) AS enroll_count
+FROM courses c
+INNER JOIN enrollments e ON c.course_id = e.course_id
+WHERE c.course_type = '专业课'
+GROUP BY c.course_id, c.course_name
+HAVING COUNT(e.student_id) > 50
+ORDER BY enroll_count ASC;
+```
+
+**关键点**：
+- 使用 `INNER JOIN` 只统计有选课记录的课程
+- `WHERE c.course_type = '专业课'` 筛选专业课
+- `HAVING COUNT(e.student_id) > 50` 过滤选课人数超过50的课程
+- `ORDER BY enroll_count ASC` 按人数升序
+
+---
+
+### 第三题：数据库设计与分析
+
+#### 1. 核心数据模型（5张表）
+
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| **students** | 学生表 | student_id(PK), student_name, student_major, student_grade |
+| **teachers** | 教师表 | teacher_id(PK), teacher_name, department, teacher_title |
+| **courses** | 课程表 | course_id(PK), course_name, course_type, capacity, teacher_id(FK) |
+| **enrollments** | 选课记录表 | student_id(FK), course_id(FK), enroll_time, status |
+| **course_schedules** | 开课计划表 | schedule_id(PK), course_id(FK), location, schedule_time |
+
+#### 2. ER图（表间关联关系）
+
+```
++-------------+         +---------------+         +-------------+
+|  students  |         |  enrollments  |         |   courses   |
++-------------+         +---------------+         +-------------+
+| PK student_id|-------->| FK student_id |         | PK course_id|
+| student_name |        | FK course_id  |<--------| course_name |
+| student_major|        | enroll_time   |         | course_type |
++-------------+        | status        |         | capacity    |
+                       +---------------+         +-------------+
+                                                      |
+                                                      | FK
+                                                      v
+                                                +-------------+
+                                                |  teachers   |
+                                                +-------------+
+                                                | PK teacher_id|
+                                                | teacher_name |
+                                                | department  |
+                                                +-------------+
+```
+
+**关联关系说明**：
+- `students 1--* enrollments`：一个学生可以选多门课程
+- `enrollments *--1 courses`：一门课程可以被多个学生选择
+- `courses *--1 teachers`：一门课程对应一个授课教师
+
+#### 3. 并发风险与解决方案
+
+**核心并发问题**：
+
+| 问题 | 说明 |
+|------|------|
+| 超卖问题 | 多个学生同时选择同一课程，导致选课人数超过容量 |
+| 数据不一致 | 并发更新导致选课状态不一致 |
+| 重复选课 | 同一学生多次提交选课请求 |
+
+**解决方案：乐观锁 + 事务控制 + 行级锁**
+
+```sql
+START TRANSACTION;
+
+-- 1. 检查课程容量（使用行级锁 FOR UPDATE）
+SELECT capacity, current_enrolled 
+FROM course_schedules 
+WHERE course_id = 'C000001' 
+FOR UPDATE;
+
+-- 2. 检查学生是否已选
+SELECT COUNT(*) FROM enrollments 
+WHERE student_id = 'S000001' AND course_id = 'C000001';
+
+-- 3. 插入选课记录
+INSERT INTO enrollments (student_id, course_id, enroll_time, status)
+VALUES ('S000001', 'C000001', NOW(), '已选');
+
+-- 4. 更新已选人数（乐观锁：检查当前人数未超容量）
+UPDATE course_schedules 
+SET current_enrolled = current_enrolled + 1 
+WHERE course_id = 'C000001' 
+  AND current_enrolled < capacity;
+
+COMMIT;
+```
+
+#### 4. 索引设计
+
+**选课记录表 (enrollments)**
+
+| 索引名 | 索引类型 | 用途 |
+|--------|----------|------|
+| PRIMARY (student_id, course_id) | 复合主键 | 去重、联合查询 |
+| idx_enrollments_student_id | 单列 | 查询学生选课记录 |
+| idx_enrollments_course_id | 单列 | 统计课程选课人数 |
+| idx_enrollments_enroll_time | 单列 | 按选课时间排序 |
+
+**课程表 (courses)**
+
+| 索引名 | 索引类型 | 用途 |
+|--------|----------|------|
+| PRIMARY (course_id) | 主键 | 主键索引 |
+| idx_courses_type | 单列 | 按课程类型筛选 |
+| idx_courses_teacher | 单列 | 按教师查询课程 |
+| idx_courses_type_name | 组合 | 专业课统计查询 |
+
+**索引设计理由**：
+1. 选课记录表以(student_id, course_id)为主键，确保去重和联合查询效率
+2. course_id索引支持按课程统计选课人数
+3. course_type索引支持按课程类型筛选和统计
+4. 组合索引优化多条件查询性能
