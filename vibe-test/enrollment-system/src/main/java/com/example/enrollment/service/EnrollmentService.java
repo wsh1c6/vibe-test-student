@@ -69,15 +69,33 @@ public class EnrollmentService {
 
         String[] lines = csvData.trim().split("\n");
         for (String line : lines) {
-            String[] parts = line.trim().split(",");
-            if (parts.length >= 3) {
+            try {
+                String trimmedLine = line.trim();
+                if (trimmedLine.isEmpty()) {
+                    continue;
+                }
+
+                String[] parts = trimmedLine.split(",");
+                if (parts.length < 3) {
+                    continue;
+                }
+
                 String studentId = parts[0].trim();
                 String courseId = parts[1].trim();
                 String courseName = parts[2].trim();
-                String courseType = parts.length > 3 ? parts[3].trim() : determineCourseType(courseName);
+
+                if (studentId.isEmpty() || courseId.isEmpty() || courseName.isEmpty()) {
+                    continue;
+                }
+
+                String courseType = parts.length > 3 && !parts[3].trim().isEmpty() 
+                    ? parts[3].trim() 
+                    : determineCourseType(courseName);
 
                 EnrollRecord record = new EnrollRecord(studentId, courseId, courseName, courseType);
                 records.add(record);
+            } catch (Exception e) {
+                continue;
             }
         }
         return records;
